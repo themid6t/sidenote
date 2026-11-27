@@ -1,6 +1,8 @@
 # sidenote
 
 Read papers side by side with Claude. Select any passage, figure or table and ask about it.
+
+![sidenote demo: select a passage and ask, then box a figure and ask](docs/demo.gif)
 You can also ask from the terminal. Your library, conversations, highlights and reading position are saved.
 
 The only requirement is [Claude Code](https://claude.com/claude-code), signed in. `sidenote` uses

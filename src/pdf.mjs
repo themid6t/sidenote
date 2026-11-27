@@ -20,16 +20,23 @@ export async function extract(bytes) {
     const doc = await task.promise;
     const meta = await doc.getMetadata().catch(() => ({}));
     const out = [];
+    let bigText = '';
     for (let n = 1; n <= doc.numPages; n++) {
       const page = await doc.getPage(n);
       const { items } = await page.getTextContent();
       let s = '';
       for (const it of items) s += (it.str ?? '') + (it.hasEOL ? '\n' : '');
+      if (n === 1) { // the title is the biggest text on page 1 (the first line may be a notice or a header)
+        const upright = items.filter((it) => it.str?.trim() && !it.transform[1] && !it.transform[2]); // not arXiv's side stamp
+        const big = Math.max(0, ...upright.map((it) => it.transform[3]));
+        bigText = upright.filter((it) => it.transform[3] > big * 0.95).map((it) => it.str.trim()).join(' ');
+      }
       if (s.trim()) out.push(`──── page ${n} ────\n${s.trim()}`);
       page.cleanup();
     }
     const text = out.join('\n\n');
     const title = String(meta.info?.Title || '').trim()
+      || (bigText.length > 8 && bigText.length < 300 ? bigText : '')
       || text.split('\n').map((l) => l.trim()).find((l) => l.length > 8 && !l.startsWith('────'))?.slice(0, 160)
       || '';
     const pages = doc.numPages;
