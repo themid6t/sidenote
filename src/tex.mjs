@@ -53,7 +53,7 @@ export function texFromSource(body, name = 'paper.tex') {
 }
 
 /** Fetch and flatten the source of an arXiv id; null when there is none. Throws on network errors. */
-export async function fetchTex(id, { base = 'https://arxiv.org', timeout = 30_000 } = {}) {
+export async function fetchTex(id, { base = 'https://arxiv.org', timeout = 300_000 } = {}) { // runs in the background: big sources (40 MB+) need time on slow links
   const res = await fetch(`${base}/e-print/${id}`, { headers: { 'user-agent': 'sidenote' }, redirect: 'follow',
     signal: AbortSignal.timeout(timeout) });
   if (!res.ok) return null;

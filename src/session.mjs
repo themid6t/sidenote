@@ -26,7 +26,8 @@ The paper's text is in ${txt}: ${paper.pages} pages, ${lines} lines, and each pa
 marker, a section heading, a term), then read around the hits with the Read tool (offset/limit) or
 \`sed -n\`. Stick to plain grep, sed and head on files in this folder: those run without interrupting
 the reader for permission (awk, pipes into other tools, or anything that writes would ask). In grep
-patterns use + or * rather than {n,m}: braces also make the command ask.
+patterns use + or * rather than {n,m}, and no $ (not even as an end-of-line anchor): braces and $ also make
+the command ask.
 The original PDF is paper.pdf.${store.hasTex(paper.id) ? `
 The LaTeX source is in paper.tex (each file starts with a "%%%% file: name" line): use it for exact
 equations, notation and definitions, with the same grep/sed rules; cite pages from paper.txt.` : ''}
@@ -96,6 +97,7 @@ export class Session extends EventEmitter {
     const paper = store.getPaper(this.paperId);
     const dir = store.paperDir(paper.id);
     fs.writeFileSync(path.join(dir, 'system-prompt.md'), systemPrompt(paper));
+    this.texKnown = store.hasTex(paper.id);
     store.addTexLater(paper.id); // older papers: in the background, for the next session
     let sid = paper.session_id;
     if (fresh || !sid) { sid = randomUUID(); store.setSession(paper.id, sid); }
@@ -238,6 +240,11 @@ export class Session extends EventEmitter {
     this.queue = []; // anything the process said between turns (startup, a background task) isn't this answer
     const started = !this.proc;
     if (started) { this.emitEvent({ type: 'status', text: 'starting Claude Code…' }); this.start({ fresh }); }
+    if (!this.texKnown && store.hasTex(this.paperId)) { // fetched in the background after this session started
+      this.texKnown = true;
+      const note = 'The LaTeX source is now in paper.tex as well: use it for exact equations, notation and definitions (same grep/sed rules); cite pages from paper.txt.\n\n';
+      prompt = typeof prompt === 'string' ? note + prompt : [{ type: 'text', text: note }, ...prompt];
+    }
     this.send({ type: 'user', message: { role: 'user', content: prompt } });
     const turn = this.turn;
     const byId = new Map();

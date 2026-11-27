@@ -85,6 +85,8 @@ body.resizing #viewerContainer { pointer-events: none; }
 .msg.assistant :is(td, th) { border: 1px solid var(--line); padding: 3px 7px; }
 .msg.assistant a.cite { color: var(--accent); text-decoration: none; border-bottom: 1px dotted currentColor; }
 .msg.assistant .katex-display { overflow-x: auto; overflow-y: hidden; }
+/* Equation numbers sit after the equation instead of pinned right, so a wide equation can't run into its "(1)". */
+.msg.assistant .katex-display > .katex > .katex-html > .katex-tag { position: static; display: inline-block; margin-left: 1em; }
 .msg.error { color: #c0392b; }
 .msg img.region { max-width: 100%; border: 1px solid var(--line); border-radius: 6px; display: block; margin-bottom: 6px; }
 .typing::after { content: "▍"; animation: blink 1s steps(1) infinite; color: var(--accent); }
