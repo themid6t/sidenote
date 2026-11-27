@@ -55,7 +55,10 @@ export async function importPaper(src) {
   fs.mkdirSync(path.join(dir, 'regions'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'paper.pdf'), bytes);
   fs.writeFileSync(path.join(dir, 'paper.txt'), text);
-  if (tex) writeTex(id, await tex);
+  if (tex) { // usually done by now; if arXiv is slow, don't hold up the add: it lands in the background
+    const t = await Promise.race([tex, new Promise((r) => setTimeout(r, 3000, 'late').unref())]);
+    if (t === 'late') tex.then((t2) => getPaper(id) && writeTex(id, t2)); else writeTex(id, t);
+  }
   write(id, 'meta.json', { id, title: title || id, source: src, pages, added_at: now(), opened_at: null,
     page: 1, page_frac: 0, scale: null, session_id: null });
   return getPaper(id);
