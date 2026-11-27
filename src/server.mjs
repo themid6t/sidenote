@@ -12,7 +12,8 @@ import assets from './assets.gen.mjs';
 const STATE = path.join(store.HOME, 'server.json');
 const MIME = { '.html': 'text/html; charset=utf-8', '.mjs': 'text/javascript', '.js': 'text/javascript',
   '.css': 'text/css', '.json': 'application/json', '.pdf': 'application/pdf', '.png': 'image/png',
-  '.gif': 'image/gif', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.ftl': 'text/plain; charset=utf-8' };
+  '.gif': 'image/gif', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.ftl': 'text/plain; charset=utf-8',
+  '.woff2': 'font/woff2' };
 const mime = (p) => MIME[path.extname(p)] || 'application/octet-stream';
 const decoded = new Map(); // asset -> {body, etag}, worked out once
 

@@ -11,7 +11,55 @@ const api = async (url, opts = {}) => {
 };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 // No images, styles or forms in answers: a hostile PDF must not get Claude to leak data through a URL.
-const md = (s) => DOMPurify.sanitize(marked.parse(s), { FORBID_TAGS: ['img', 'style', 'form', 'input', 'iframe'], FORBID_ATTR: ['style', 'srcset'] });
+const PURIFY = { FORBID_TAGS: ['img', 'style', 'form', 'input', 'iframe'], FORBID_ATTR: ['style', 'srcset'] };
+let katex = null, numPages = 0; // set by reader() once loaded
+// Math is cut out before marked (which would mangle _ and \) and put back as KaTeX into text nodes only, after
+// sanitizing. KaTeX's own output (it needs inline styles) is sanitized too, with style allowed just there.
+// Code spans and fences (an unclosed one runs to the end, as it does while streaming) are matched first and kept.
+const MATH = /(```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|`[^`\n]*`)|\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|(?<![\\$\w])\$(?![\s$])((?:\\.|[^$\\\n])+?)(?<!\s)\$(?![\d$])/g;
+const CITE = /\b(?:pp?\.|[Pp]ages?)\s*(\d+)(?:\s*[–-]\s*\d+)?/g;
+const md = (s) => {
+  const math = [];
+  s = s.replace(MATH, (m, code, d1, d2, i1, i2) => {
+    if (code || !katex) return m;
+    math.push([d1 ?? d2 ?? i1 ?? i2, d1 != null || d2 != null]);
+    return `${math.length - 1}`;
+  });
+  const t = document.createElement('template');
+  t.innerHTML = DOMPurify.sanitize(marked.parse(s), PURIFY);
+  swapText(t.content, CITE, 'code, pre, a', (m) => {
+    const n = Number(m[1]);
+    if (!(n >= 1 && n <= numPages)) return null;
+    const a = document.createElement('a');
+    Object.assign(a, { href: `#page=${n}`, className: 'cite', textContent: m[0], title: `Go to page ${n}` });
+    a.dataset.page = n;
+    return a;
+  });
+  swapText(t.content, /(\d+)/g, 'code, pre', (m) => {
+    const [tex, displayMode] = math[m[1]] ?? [];
+    if (tex == null) return null;
+    const k = document.createElement('template');
+    k.innerHTML = DOMPurify.sanitize(katex.renderToString(tex, { displayMode, throwOnError: false }), { ...PURIFY, FORBID_ATTR: ['srcset'] });
+    return k.content;
+  });
+  return t.innerHTML;
+};
+/** Replace matches of `re` in the text nodes under `root` (outside `skip`) with what `make` returns (null: leave it). */
+function swapText(root, re, skip, make) {
+  const nodes = [];
+  for (const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); w.nextNode();) {
+    if (!w.currentNode.parentElement?.closest(skip)) nodes.push(w.currentNode);
+  }
+  for (const n of nodes) {
+    const parts = [];
+    let last = 0;
+    for (const m of n.data.matchAll(re)) {
+      const made = make(m);
+      if (made) { parts.push(n.data.slice(last, m.index), made); last = m.index + m[0].length; }
+    }
+    if (parts.length) n.replaceWith(...parts, n.data.slice(last));
+  }
+}
 
 const paperId = location.pathname.match(/^\/p\/([\w.-]+)$/)?.[1];
 if (paperId) reader(decodeURIComponent(paperId)); else library();
@@ -89,6 +137,7 @@ async function reader(id) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/build/pdf.worker.mjs';
   // Start everything at once: the viewer code, the paper's info, and the PDF (worker + download + parse).
   const viewerCode = import('/vendor/pdfjs/web/pdf_viewer.mjs');
+  const katexCode = import('/vendor/katex/katex.mjs');
   const info = api(`/api/papers/${encodeURIComponent(id)}`);
   const loading = pdfjsLib.getDocument({
     url: `/api/papers/${encodeURIComponent(id)}/pdf`,
@@ -115,6 +164,7 @@ async function reader(id) {
   performance.mark('sidenote:doc');
   viewer.setDocument(doc);
   linkService.setDocument(doc);
+  numPages = doc.numPages;
   // Links inside the PDF (contents, citations) go into the browser's history, so Back returns to where you were.
   const pdfHistory = new PDFHistory({ linkService, eventBus });
   linkService.setHistory(pdfHistory);
@@ -344,7 +394,50 @@ async function reader(id) {
     chat.append(el);
     return el;
   };
+  // A page cited in an answer: go there (through the link service, so Back returns), and flash a passage the
+  // answer quotes if that page's text has it (exact match, ignoring case and spaces); else flash the page.
+  const flashCite = (pageNumber, quotes) => {
+    linkService.goToPage(pageNumber);
+    const norm = (x) => x.toLowerCase().replace(/\s+/g, '');
+    let tries = 0;
+    const attempt = () => {
+      const div = viewer.getPageView(pageNumber - 1)?.div;
+      const spans = [...(div?.querySelectorAll('.textLayer span:not(.markedContent)') ?? [])];
+      if (!spans.length && tries++ < 30) return setTimeout(attempt, 100); // the text layer is still being drawn
+      if (!div) return;
+      const starts = [];
+      let hay = '';
+      for (const sp of spans) { starts.push(hay.length); hay += norm(sp.textContent); }
+      for (const q of quotes.map(norm)) {
+        const at = q && hay.indexOf(q);
+        if (!(at >= 0)) continue;
+        const hit = spans.filter((sp, i) => starts[i] < at + q.length && starts[i] + norm(sp.textContent).length > at);
+        const pr = div.getBoundingClientRect();
+        const marks = hit.map((sp) => {
+          const r = sp.getBoundingClientRect();
+          const m = document.createElement('div');
+          m.className = 'hl flash cite-flash';
+          Object.assign(m.style, { left: `${(r.left - pr.left) / pr.width * 100}%`, top: `${(r.top - pr.top) / pr.height * 100}%`,
+            width: `${r.width / pr.width * 100}%`, height: `${r.height / pr.height * 100}%` });
+          layerOf(pageNumber).append(m);
+          return m;
+        });
+        marks[0]?.scrollIntoView({ block: 'center' });
+        setTimeout(() => marks.forEach((m) => m.remove()), 1500);
+        return;
+      }
+      div.classList.remove('flash-page'); void div.offsetWidth; div.classList.add('flash-page');
+    };
+    setTimeout(attempt, 50);
+  };
   chat.addEventListener('click', (e) => {
+    const cite = e.target.closest('a.cite');
+    if (cite) {
+      e.preventDefault();
+      const block = cite.closest('p, li, td, th, blockquote, h1, h2, h3, h4') || cite.parentElement;
+      flashCite(Number(cite.dataset.page), [...block.textContent.matchAll(/["“]([^"”\n]{4,160})["”]/g)].map((m) => m[1]));
+      return;
+    }
     const q = e.target.closest('blockquote[data-page]');
     if (!q) return;
     const page = Number(q.dataset.page);
@@ -360,6 +453,7 @@ async function reader(id) {
       }
     }, 150);
   });
+  katex = (await katexCode).default;
   const renderHistory = (messages) => { chat.innerHTML = ''; messages.forEach(renderMessage); chat.scrollTop = chat.scrollHeight; };
   renderHistory(data.messages);
 
