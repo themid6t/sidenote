@@ -1,6 +1,6 @@
 {
   "name": "sidenote",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Read papers side by side with Claude: a CLI plus a local web reader",
   "type": "module",
   "bin": {
