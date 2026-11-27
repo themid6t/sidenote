@@ -12,7 +12,11 @@ your Claude Code login, so it needs no API key.
 curl -fsSL https://raw.githubusercontent.com/themid6t/sidenote/main/install.sh | sh
 ```
 
-On Windows, download `sidenote-windows-x64.exe` from the latest release.
+On Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/themid6t/sidenote/main/install.ps1 | iex
+```
 
 ## Use
 

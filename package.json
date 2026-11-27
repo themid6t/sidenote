@@ -10,6 +10,7 @@
     "node": ">=24"
   },
   "license": "MIT",
+  "packageManager": "pnpm@12.18.0",
   "dependencies": {
     "dompurify": "^3.5.0",
     "marked": "18.3.0",

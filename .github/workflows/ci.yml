@@ -1,0 +1,39 @@
+name: ci
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.4.0 }
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/build.mjs --compile
+      - uses: actions/upload-artifact@v4
+        with: { name: binaries, path: dist/ }
+
+  smoke:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, bin: sidenote-linux-x64 }
+          - { os: ubuntu-24.04-arm, bin: sidenote-linux-arm64 }
+          - { os: macos-latest, bin: sidenote-darwin-arm64 }
+          - { os: macos-15-intel, bin: sidenote-darwin-x64 }
+          - { os: windows-latest, bin: sidenote-windows-x64.exe }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - uses: actions/download-artifact@v4
+        with: { name: binaries, path: dist }
+      - run: chmod +x dist/*
+        if: runner.os != 'Windows'
+      - run: node tests/smoke.mjs dist/${{ matrix.bin }}

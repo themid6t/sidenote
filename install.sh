@@ -5,7 +5,7 @@ set -eu
 REPO="${SIDENOTE_REPO:-themid6t/sidenote}"
 DEST="${SIDENOTE_BIN:-$HOME/.local/bin}"
 
-case "$(uname -s)" in Linux) os=linux ;; Darwin) os=darwin ;; *) echo "unsupported OS: use the Windows .exe from the releases page" >&2; exit 1 ;; esac
+case "$(uname -s)" in Linux) os=linux ;; Darwin) os=darwin ;; *) echo "unsupported OS: on Windows use install.ps1 (see the README)" >&2; exit 1 ;; esac
 case "$(uname -m)" in x86_64|amd64) arch=x64 ;; arm64|aarch64) arch=arm64 ;; *) echo "unsupported CPU: $(uname -m)" >&2; exit 1 ;; esac
 
 url="https://github.com/$REPO/releases/latest/download/sidenote-$os-$arch"
