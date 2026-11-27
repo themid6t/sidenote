@@ -4,6 +4,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as store from './store.mjs';
+import { exportMarkdown, slug } from './export.mjs';
 import { getSession, closeAll, OVERVIEW } from './session.mjs';
 import { VERSION, newerVersion } from './update.mjs';
 
@@ -132,6 +133,12 @@ async function route(req, res, url) {
       session: getSession(paper.id).snapshot() });
   }
   if (sub === '/pdf') return serveFile(res, path.join(store.paperDir(paper.id), 'paper.pdf'));
+  if (sub === '/export' && req.method === 'GET') {
+    const name = `${slug(paper.title, paper.id)}.md`;
+    res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8', 'content-disposition':
+      `attachment; filename="${name.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(name)}` });
+    return res.end(exportMarkdown(paper.id));
+  }
   if (sub === '/state' && req.method === 'POST') {
     store.saveState(paper.id, await readJson(req));
     return send(res, 200, { ok: true });

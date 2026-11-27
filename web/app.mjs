@@ -587,6 +587,7 @@ async function reader(id) {
       status.textContent = err.message;
     }
   }
+  $('#export').href = `/api/papers/${encodeURIComponent(id)}/export`;
   $('#new-chat').onclick = async () => {
     if (busy || !chat.children.length) return;
     if (!confirm('Start a new chat? The current one is archived in the paper\'s folder, not deleted.')) return;

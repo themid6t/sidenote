@@ -42,5 +42,10 @@ try {
   assert.match(run('ask', added.id, 'hello'), /FAKE ANSWER turn=1/);           // through the reader's live session
   assert.match(run('ask', added.id, 'again'), /FAKE ANSWER turn=2/);           // same claude process
   assert.match(run('history', added.id), /hello[\s\S]*FAKE ANSWER/);
+  assert.match(run('export', added.id, '-'), /^---\ntitle: "Smoke Test Paper"[\s\S]*### You\n\nhello\n\n### Claude\n\nFAKE ANSWER/);
+  const exp = await fetch(`${base}/api/papers/${added.id}/export`, { headers: { authorization: `Bearer ${token}` } });
+  assert.match(exp.headers.get('content-disposition'), /filename="smoke-test-paper\.md"/);
+  assert.match(await exp.text(), /FAKE ANSWER turn=2/);
+  assert.equal((await fetch(`${base}/api/papers/${added.id}/export`)).status, 401);
 } finally { server.kill(); }
 console.log('smoke ok');
