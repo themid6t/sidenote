@@ -29,8 +29,13 @@ export async function extract(bytes) {
       if (n === 1) { // the title is the biggest text on page 1 (the first line may be a notice or a header)
         const upright = items.filter((it) => it.str?.trim() && !it.transform[1] && !it.transform[2]); // not arXiv's side stamp
         const big = Math.max(0, ...upright.map((it) => it.transform[3]));
-        // Whole lines that hold the biggest text, so small-caps titles keep their smaller letters.
-        const lines = new Set(upright.filter((it) => it.transform[3] > big * 0.95).map((it) => Math.round(it.transform[5])));
+        // The first block of lines set in the biggest text, top down, stopping at a gap (a scan's body text can be
+        // the same size as its title). Whole lines, so small-caps titles keep their smaller letters.
+        const ys = [...new Set(upright.filter((it) => it.transform[3] > big * 0.95).map((it) => Math.round(it.transform[5])))]
+          .sort((a, b) => b - a);
+        const block = [ys[0]];
+        for (const y of ys.slice(1)) { if (block.at(-1) - y > big * 2) break; block.push(y); }
+        const lines = new Set(block);
         bigText = items.filter((it) => !it.transform[1] && !it.transform[2] && lines.has(Math.round(it.transform[5])))
           .map((it) => it.str + (it.hasEOL ? ' ' : '')).join('').replace(/\s+/g, ' ').trim();
       }

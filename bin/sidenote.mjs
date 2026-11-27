@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // sidenote: read papers side by side with Claude. Needs only Claude Code (`claude` on PATH).
 import { execFileSync, spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import * as store from '../src/store.mjs';
 import readline from 'node:readline';
 import { getSession } from '../src/session.mjs';
@@ -17,11 +19,36 @@ const HELP = `sidenote ${VERSION}: read papers side by side with Claude
   sidenote new <paper>                 start a fresh chat (the old one is archived)
   sidenote rm <paper>                  delete a paper and its history
   sidenote serve [--port N]            run the reader without opening a browser
+  sidenote update                      install the latest release
 
 <paper> is an id, an arXiv id, or any unique part of the title.
-In the reader: select text and ask, ctrl+E explains the selection,
+In the reader: select text and ask, E explains the selection,
 R then drag captures a region (figures, tables). Data lives in:
   ${store.HOME}`;
+
+const REPO = 'themid6t/sidenote';
+const INSTALL = process.platform === 'win32'
+  ? `irm https://raw.githubusercontent.com/${REPO}/main/install.ps1 | iex`
+  : `curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | sh`;
+
+// At most once a day, ask GitHub for the latest release and mention it if it's newer. Never blocks or fails a command.
+// Off with SIDENOTE_NO_UPDATE_CHECK=1.
+function checkForUpdate() {
+  if (VERSION === 'dev' || process.env.SIDENOTE_NO_UPDATE_CHECK) return;
+  const file = path.join(store.HOME, 'update-check.json');
+  let last = {};
+  try { last = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
+  const newer = (v) => v && v.localeCompare(VERSION, undefined, { numeric: true }) > 0;
+  const tell = (v) => console.error(dim(`sidenote ${v} is out (you have ${VERSION}). Update: sidenote update`));
+  if (Date.now() - (last.at || 0) < 864e5) { if (newer(last.latest)) tell(last.latest); return; }
+  fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { signal: AbortSignal.timeout(5000) })
+    .then((r) => r.json()).then(({ tag_name }) => {
+      const latest = String(tag_name || '').replace(/^v/, '');
+      fs.mkdirSync(store.HOME, { recursive: true });
+      fs.writeFileSync(file, JSON.stringify({ at: Date.now(), latest }));
+      if (newer(latest)) tell(latest);
+    }).catch(() => {});
+}
 
 const dim = (s) => (process.stdout.isTTY ? `\x1b[2m${s}\x1b[0m` : s);
 const bold = (s) => (process.stdout.isTTY ? `\x1b[1m${s}\x1b[0m` : s);
@@ -135,8 +162,17 @@ try {
       }
       break;
     }
+    case 'update': { // the installer always fetches the latest release, so reuse it
+      if (VERSION === 'dev') fail('this is a development copy; update it with git pull');
+      const dir = path.dirname(process.execPath);
+      const [sh, args] = process.platform === 'win32'
+        ? ['powershell', ['-NoProfile', '-Command', INSTALL]] : ['sh', ['-c', INSTALL]];
+      const r = spawn(sh, args, { stdio: 'inherit', env: { ...process.env, SIDENOTE_BIN: dir } });
+      process.exitCode = await new Promise((res) => r.on('close', res));
+      break;
+    }
     case 'open': {
-      needClaude();
+      needClaude(); checkForUpdate();
       if (!rest[0]) { await serveAndOpen(null); break; }
       let p;
       try { p = store.findPaper(rest.join(' ')); } catch { p = await addPaper(rest[0]); }
@@ -144,7 +180,7 @@ try {
       break;
     }
     case 'serve': {
-      needClaude();
+      needClaude(); checkForUpdate();
       const i = rest.indexOf('--port');
       await serveAndOpen(null, { open: false, port: i >= 0 ? Number(rest[i + 1]) : undefined });
       break;
@@ -185,7 +221,7 @@ try {
     }
     default: {
       // `sidenote <pdf|id|url>` or `sidenote <part of a title>`
-      needClaude();
+      needClaude(); checkForUpdate();
       const arg = [cmd, ...rest].join(' ');
       let p;
       try { p = store.findPaper(arg); } catch { p = await addPaper(cmd); }

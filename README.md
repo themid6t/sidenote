@@ -21,6 +21,8 @@ On Windows (PowerShell):
 irm https://raw.githubusercontent.com/themid6t/sidenote/main/install.ps1 | iex
 ```
 
+The installer always fetches the latest release. To update later, run `sidenote update`; sidenote also mentions a new release when one is out (it checks GitHub at most once a day; set `SIDENOTE_NO_UPDATE_CHECK=1` to turn that off).
+
 ## Use
 
 ```sh

@@ -85,7 +85,7 @@ async function reader(id) {
     standardFontDataUrl: '/vendor/pdfjs/standard_fonts/', wasmUrl: '/vendor/pdfjs/wasm/', iccUrl: '/vendor/pdfjs/iccs/',
   }).promise;
   loading.catch(() => {}); // awaited below; this only stops an early failure being reported as unhandled
-  const { EventBus, PDFViewer, PDFLinkService } = await viewerCode;
+  const { EventBus, PDFViewer, PDFLinkService, PDFHistory } = await viewerCode;
   performance.mark('sidenote:viewer-code');
   const data = await info;
   const { paper } = data;
@@ -104,6 +104,9 @@ async function reader(id) {
   performance.mark('sidenote:doc');
   viewer.setDocument(doc);
   linkService.setDocument(doc);
+  // Links inside the PDF (contents, citations) go into the browser's history, so Back returns to where you were.
+  const pdfHistory = new PDFHistory({ linkService, eventBus });
+  linkService.setHistory(pdfHistory);
 
   // Restore where you were.
   eventBus.on('pagesinit', () => {
@@ -112,6 +115,7 @@ async function reader(id) {
     // Right away, not next frame: otherwise pdf.js starts drawing page 1 first and throws that work away.
     const pv = viewer.getPageView(Math.min(paper.page, doc.numPages) - 1);
     if (pv) container.scrollTop = pv.div.offsetTop + paper.page_frac * pv.div.clientHeight;
+    pdfHistory.initialize({ fingerprint: doc.fingerprints[0], updateUrl: false });
   });
   const pageLabel = () => { $('#pageno').textContent = `${viewer.currentPageNumber} / ${doc.numPages}`; };
   eventBus.on('pagechanging', pageLabel);

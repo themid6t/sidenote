@@ -6,7 +6,12 @@ $dest = if ($env:SIDENOTE_BIN) { $env:SIDENOTE_BIN } else { Join-Path $env:LOCAL
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
 $url = "https://github.com/$repo/releases/latest/download/sidenote-windows-x64.exe"
 Write-Host "Downloading $url"
-Invoke-WebRequest -Uri $url -OutFile (Join-Path $dest 'sidenote.exe') -UseBasicParsing
+$exe = Join-Path $dest 'sidenote.exe'
+Invoke-WebRequest -Uri $url -OutFile "$exe.new" -UseBasicParsing
+# A running sidenote.exe (as during `sidenote update`) can't be overwritten, but it can be renamed out of the way.
+Remove-Item "$exe.old" -Force -ErrorAction SilentlyContinue
+if (Test-Path $exe) { Move-Item $exe "$exe.old" -Force }
+Move-Item "$exe.new" $exe -Force
 $path = [Environment]::GetEnvironmentVariable('Path', 'User')
 if (($path -split ';') -notcontains $dest) {
   [Environment]::SetEnvironmentVariable('Path', "$dest;$path", 'User')
