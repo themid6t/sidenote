@@ -36,7 +36,7 @@ sidenote rm attention
 In the reader:
 
 - **Ask about text:** select it, then type a question.
-- **Explain a passage:** select it and press `Ctrl+E`.
+- **Explain a passage:** select it and press `E`.
 - **Figures and tables:** press `R` (or click **Region**) and drag a box over the figure or table.
 - **Find a past question:** click a past question's quote to jump to its highlight, or click a highlight to jump to the conversation.
 

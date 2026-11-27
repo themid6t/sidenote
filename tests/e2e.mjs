@@ -117,7 +117,7 @@ try {
   await again.waitForSelector('.page[data-page-number="1"] .hl:not(.pending)');
   await again.screenshot({ path: path.join(shots, '5-reopened.png') });
 
-  log('ctrl+E explains a selection');
+  log('E explains a selection');
   const before = await again.locator('.msg').count();
   const span = again.locator('.page[data-page-number="1"] .textLayer span').filter({ hasText: /^The audit yields 13/ }).first();
   await span.scrollIntoViewIfNeeded();
@@ -127,7 +127,7 @@ try {
   await again.mouse.move(sb.x + sb.width - 1, sb.y + sb.height / 2, { steps: 5 });
   await again.mouse.up();
   await again.waitForSelector('#quote:not([hidden])');
-  await again.keyboard.press('Control+e');
+  await again.keyboard.press('e');
   await settle(again, (n) => document.querySelectorAll('.msg').length >= n + 2 && !document.querySelector('.typing'), before);
   const explained = (await api(`/api/papers/${paper.id}`)).messages.at(-2);
   assert.match(explained.content, /^Explain this/);

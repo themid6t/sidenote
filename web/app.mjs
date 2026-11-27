@@ -29,10 +29,11 @@ async function library() {
   $('#add').onsubmit = async (e) => {
     e.preventDefault();
     $('#add-status').textContent = 'Adding…';
+    e.submitter && (e.submitter.disabled = true); // one import at a time
     try {
       const p = await api('/api/papers', { method: 'POST', body: JSON.stringify({ src: $('#src').value }) });
       location.href = `/p/${encodeURIComponent(p.id)}`;
-    } catch (err) { $('#add-status').textContent = err.message; }
+    } catch (err) { $('#add-status').textContent = err.message; if (e.submitter) e.submitter.disabled = false; }
   };
 }
 
@@ -202,9 +203,16 @@ async function reader(id) {
       data-msg="${h.message_id ?? ''}" style="left:${x * 100}%;top:${y * 100}%;width:${w * 100}%;height:${hh * 100}%"></div>`)).join('');
   };
   eventBus.on('pagerendered', (e) => { performance.mark(`sidenote:rendered:${e.pageNumber}`); drawPage(e.pageNumber); });
+  // Clicking a saved highlight (not dragging) shows the message it belongs to.
   viewerEl.addEventListener('click', (e) => {
-    const msg = e.target.closest?.('.hl')?.dataset.msg;
-    if (msg) document.getElementById(`m${msg}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (!getSelection().isCollapsed || regionMode) return;
+    const pageDiv = e.target.closest?.('.page');
+    if (!pageDiv) return;
+    const pr = pageDiv.getBoundingClientRect();
+    const x = (e.clientX - pr.left) / pr.width, y = (e.clientY - pr.top) / pr.height;
+    const h = highlights.findLast((h) => h.page === Number(pageDiv.dataset.pageNumber)
+      && h.rects.some(([rx, ry, rw, rh]) => x >= rx && x <= rx + rw && y >= ry && y <= ry + rh));
+    if (h) document.getElementById(`m${h.message_id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   const setPending = (p) => {
     const before = pending?.page;
@@ -222,7 +230,11 @@ async function reader(id) {
     const sel = getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
     // Join the PDF's hard line breaks into prose; keep blank-line paragraph breaks.
-    const text = sel.toString().replace(/[ \t]*\n[ \t]*/g, '\n').replace(/([^\n])\n(?!\n)/g, '$1 ').trim();
+    const text = sel.toString().replace(/[ \t]*\n[ \t]*/g, '\n')
+      // A word split across lines: "challeng-\ning" → "challenging", but "state-of-\nthe-art" keeps its hyphen.
+      .replace(/(\S*\p{L})-\n(?=\p{Ll})/gu, (m, w) => (w.includes('-') ? `${w}-` : w))
+      .replace(/(\p{L})-\n(?=\p{Lu})/gu, '$1-') // "Self-\nAttention" → "Self-Attention"
+      .replace(/([^\n])\n(?!\n)/g, '$1 ').trim();
     const range = sel.getRangeAt(0);
     const start = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
     const pageDiv = start?.closest('.page');
@@ -444,7 +456,11 @@ async function reader(id) {
         break;
     }
   };
-  events.onerror = () => { status.textContent = 'reconnecting…'; };
+  events.onerror = () => {
+    status.textContent = events.readyState === EventSource.CLOSED
+      ? `Lost the reader. Run: sidenote open ${id}` // the browser gave up (e.g. the reader's token changed)
+      : 'reconnecting…';
+  };
 
   async function ask(question) {
     if (busy || !question.trim()) return;
@@ -486,7 +502,8 @@ async function reader(id) {
       e.preventDefault(); // zoom the paper, not the whole app
       if (e.key === '0') keepPlace(() => { viewer.currentScaleValue = 'page-width'; });
       else zoomBy(e.key === '-' ? 1 / 1.15 : 1.15);
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
+    } else if (e.key.toLowerCase() === 'e' && !e.altKey && (e.ctrlKey || e.metaKey || !typing)) {
+      // E (Ctrl+E is the browser's own shortcut in Chrome and Brave; it is kept for browsers that pass it on).
       e.preventDefault();
       const s = !pending && readSelection();
       if (s) setPending({ text: s.text, page: s.page, rects: s.rects });

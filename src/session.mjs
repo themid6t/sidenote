@@ -22,9 +22,11 @@ function systemPrompt(paper) {
 in a PDF reader with this chat next to it. You are a full Claude Code session in the paper's folder (${dir}).
 
 The paper's text is in ${txt}: ${paper.pages} pages, ${lines} lines, and each page starts with a
-"──── page N ────" line. It is too big to read in one go: use the Grep tool to find things (a page
-marker, a section, a term), then the Read tool with offset/limit around the hits. Use those two, not
-Bash, to look through the paper: they run without interrupting the reader for permission.
+"──── page N ────" line. It is too big to read in one go: find things with \`grep -n\` (a page
+marker, a section heading, a term), then read around the hits with the Read tool (offset/limit) or
+\`sed -n\`. Stick to plain grep, sed and head on files in this folder: those run without interrupting
+the reader for permission (awk, pipes into other tools, or anything that writes would ask). In grep
+patterns use + or * rather than {n,m}: braces also make the command ask.
 The original PDF is paper.pdf.
 
 Messages may quote a highlighted passage with its page. Region highlights come with an image path:

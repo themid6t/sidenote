@@ -55,7 +55,8 @@ body.resizing #viewerContainer { pointer-events: none; }
 
 /* Highlights drawn over pages (percent boxes: zoom-proof) */
 .hl-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
-.hl { position: absolute; background: var(--hl); mix-blend-mode: multiply; border-radius: 2px; pointer-events: auto; cursor: pointer; }
+/* Never under the mouse: a drag ending on a highlight would otherwise select the rest of the page. Clicks are matched by position. */
+.hl { position: absolute; background: var(--hl); mix-blend-mode: multiply; border-radius: 2px; }
 .hl.pending { background: var(--hl-strong); }
 .hl.region { background: rgba(255, 196, 0, .18); outline: 2px solid var(--hl-strong); }
 .hl.flash { animation: flash 1.2s ease-out; }

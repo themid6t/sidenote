@@ -26,7 +26,14 @@ export async function runningServer() {
 }
 
 export function startServer({ port = 4747 } = {}) {
-  const token = randomBytes(24).toString('hex');
+  // The same token across restarts, so an open tab reconnects by itself. Private file, like an SSH key.
+  const tokenFile = path.join(store.HOME, 'token');
+  let token;
+  try { token = fs.readFileSync(tokenFile, 'utf8').trim(); } catch {}
+  if (!/^[0-9a-f]{48}$/.test(token || '')) {
+    token = randomBytes(24).toString('hex');
+    fs.writeFileSync(tokenFile, token, { mode: 0o600 });
+  }
   const same = (a) => a && a.length === token.length && timingSafeEqual(Buffer.from(a), Buffer.from(token));
 
   const server = http.createServer(async (req, res) => {
