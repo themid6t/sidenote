@@ -37,3 +37,4 @@ jobs:
       - run: chmod +x dist/*
         if: runner.os != 'Windows'
       - run: node tests/smoke.mjs dist/${{ matrix.bin }}
+      - run: node tests/tex.mjs

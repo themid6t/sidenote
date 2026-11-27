@@ -68,7 +68,7 @@ async function serveAndOpen(paperId, { open = true, port } = {}) {
 async function addPaper(src) {
   process.stdout.write(dim('adding… '));
   const p = await store.importPaper(src);
-  console.log(`${bold(p.title)} ${dim(`(${p.id}, ${p.pages} pages)`)}`);
+  console.log(`${bold(p.title)} ${dim(`(${p.id}, ${p.pages} pages${store.hasTex(p.id) ? ', LaTeX source' : ''})`)}`);
   return p;
 }
 

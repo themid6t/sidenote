@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { extract } from './pdf.mjs';
+import { fetchTex } from './tex.mjs';
 
 export const HOME = process.env.SIDENOTE_HOME || (process.platform === 'win32'
   ? path.join(process.env.APPDATA || os.homedir(), 'sidenote')
@@ -39,6 +40,7 @@ export async function importPaper(src) {
     bytes = fs.readFileSync(path.resolve(src.replace(/^~(?=[\\/])/, os.homedir())));
   }
   if (id && getPaper(id)) return getPaper(id);
+  const tex = id && fetchTex(id).catch(() => null); // in parallel with the PDF; best-effort
   if (url) {
     const res = await fetch(url, { headers: { 'user-agent': 'sidenote' }, redirect: 'follow' });
     if (!res.ok) throw new Error(`download failed: ${res.status} ${url}`);
@@ -53,9 +55,27 @@ export async function importPaper(src) {
   fs.mkdirSync(path.join(dir, 'regions'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'paper.pdf'), bytes);
   fs.writeFileSync(path.join(dir, 'paper.txt'), text);
+  if (tex) writeTex(id, await tex);
   write(id, 'meta.json', { id, title: title || id, source: src, pages, added_at: now(), opened_at: null,
     page: 1, page_frac: 0, scale: null, session_id: null });
   return getPaper(id);
+}
+
+const writeTex = (id, tex) => {
+  if (!tex) return false;
+  const f = path.join(paperDir(id), 'paper.tex');
+  fs.writeFileSync(f + '.tmp', tex);
+  fs.renameSync(f + '.tmp', f);
+  return true;
+};
+export const hasTex = (id) => fs.existsSync(path.join(paperDir(id), 'paper.tex'));
+
+const tried = new Set();
+/** Papers added before paper.tex existed: fetch it in the background, once per run; it's there next session. */
+export function addTexLater(id) {
+  if (tried.has(id) || !ARXIV.test(id) || hasTex(id)) return;
+  tried.add(id);
+  fetchTex(id).then((t) => getPaper(id) && writeTex(id, t)).catch(() => {});
 }
 
 export const getPaper = (id) => (/^[\w.-]+$/.test(id) ? read(id, 'meta.json', null) : null);
