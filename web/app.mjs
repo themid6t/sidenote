@@ -75,9 +75,18 @@ async function reader(id) {
   });
   globalThis.pdfjsLib = pdfjsLib; // pdf_viewer.mjs reads the library from here
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/build/pdf.worker.mjs';
-  const { EventBus, PDFViewer, PDFLinkService } = await import('/vendor/pdfjs/web/pdf_viewer.mjs');
-
-  const data = await api(`/api/papers/${encodeURIComponent(id)}`);
+  // Start everything at once: the viewer code, the paper's info, and the PDF (worker + download + parse).
+  const viewerCode = import('/vendor/pdfjs/web/pdf_viewer.mjs');
+  const info = api(`/api/papers/${encodeURIComponent(id)}`);
+  const loading = pdfjsLib.getDocument({
+    url: `/api/papers/${encodeURIComponent(id)}/pdf`,
+    cMapUrl: '/vendor/pdfjs/cmaps/', cMapPacked: true,
+    standardFontDataUrl: '/vendor/pdfjs/standard_fonts/', wasmUrl: '/vendor/pdfjs/wasm/', iccUrl: '/vendor/pdfjs/iccs/',
+  }).promise;
+  loading.catch(() => {}); // awaited below; this only stops an early failure being reported as unhandled
+  const { EventBus, PDFViewer, PDFLinkService } = await viewerCode;
+  performance.mark('sidenote:viewer-code');
+  const data = await info;
   const { paper } = data;
   let highlights = data.highlights;
   document.title = paper.title;
@@ -90,21 +99,18 @@ async function reader(id) {
   const viewer = new PDFViewer({ container, viewer: viewerEl, eventBus, linkService, removePageBorders: false });
   linkService.setViewer(viewer);
 
-  const doc = await pdfjsLib.getDocument({
-    url: `/api/papers/${encodeURIComponent(id)}/pdf`,
-    cMapUrl: '/vendor/pdfjs/cmaps/', cMapPacked: true,
-    standardFontDataUrl: '/vendor/pdfjs/standard_fonts/', wasmUrl: '/vendor/pdfjs/wasm/', iccUrl: '/vendor/pdfjs/iccs/',
-  }).promise;
+  const doc = await loading;
+  performance.mark('sidenote:doc');
   viewer.setDocument(doc);
   linkService.setDocument(doc);
 
   // Restore where you were.
   eventBus.on('pagesinit', () => {
+    performance.mark('sidenote:pagesinit');
     viewer.currentScaleValue = paper.scale || 'page-width';
-    requestAnimationFrame(() => {
-      const pv = viewer.getPageView(Math.min(paper.page, doc.numPages) - 1);
-      if (pv) container.scrollTop = pv.div.offsetTop + paper.page_frac * pv.div.clientHeight;
-    });
+    // Right away, not next frame: otherwise pdf.js starts drawing page 1 first and throws that work away.
+    const pv = viewer.getPageView(Math.min(paper.page, doc.numPages) - 1);
+    if (pv) container.scrollTop = pv.div.offsetTop + paper.page_frac * pv.div.clientHeight;
   });
   const pageLabel = () => { $('#pageno').textContent = `${viewer.currentPageNumber} / ${doc.numPages}`; };
   eventBus.on('pagechanging', pageLabel);
@@ -195,7 +201,7 @@ async function reader(id) {
     layer.innerHTML = items.flatMap((h) => h.rects.map(([x, y, w, hh]) => `<div class="hl ${h.cls}${h.rects.length === 1 && hh > 0.05 ? ' region' : ''}"
       data-msg="${h.message_id ?? ''}" style="left:${x * 100}%;top:${y * 100}%;width:${w * 100}%;height:${hh * 100}%"></div>`)).join('');
   };
-  eventBus.on('pagerendered', (e) => drawPage(e.pageNumber));
+  eventBus.on('pagerendered', (e) => { performance.mark(`sidenote:rendered:${e.pageNumber}`); drawPage(e.pageNumber); });
   viewerEl.addEventListener('click', (e) => {
     const msg = e.target.closest?.('.hl')?.dataset.msg;
     if (msg) document.getElementById(`m${msg}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -272,6 +278,7 @@ async function reader(id) {
       setRegionMode(false);
       if (b.width < 8 || b.height < 8) return;
       const canvas = pageDiv.querySelector('canvas');
+      if (!canvas) return; // the page hasn't been drawn yet
       const cr = canvas.getBoundingClientRect();
       const k = canvas.width / cr.width;
       const crop = document.createElement('canvas');

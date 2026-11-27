@@ -165,6 +165,15 @@ export class Session extends EventEmitter {
     return true;
   }
 
+  /** Start the process before the first question, so it is ready by the time one is typed. */
+  warm() {
+    if (this.proc || this.busy) return;
+    this.start();
+    clearTimeout(this.idle);
+    this.idle = setTimeout(() => this.close(), IDLE_MS);
+    this.idle.unref?.();
+  }
+
   /** End the process; `now` kills it at once (used on exit, when timers no longer run). */
   close(now = false) {
     clearTimeout(this.idle);
@@ -220,6 +229,7 @@ export class Session extends EventEmitter {
 
   async runTurn(prompt, { fresh = false } = {}) {
     if (fresh) this.close();
+    this.queue = []; // anything the process said between turns (startup, a background task) isn't this answer
     const started = !this.proc;
     if (started) { this.emitEvent({ type: 'status', text: 'starting Claude Code…' }); this.start({ fresh }); }
     this.send({ type: 'user', message: { role: 'user', content: prompt } });
@@ -228,7 +238,7 @@ export class Session extends EventEmitter {
     for (;;) {
       const e = await this.nextEvent();
       if (e.type === 'exit') {
-        const lost = started && /no conversation found/i.test(this.stderr);
+        const lost = /no conversation found/i.test(this.stderr); // stderr is this process's own
         const error = this.stderr.trim().split('\n').slice(-2).join(' ') || `Claude Code exited (${e.code})`;
         return { text: turn.text, lost, error: lost ? null : error };
       }
@@ -265,7 +275,7 @@ export class Session extends EventEmitter {
           this.emitEvent({ type: 'delta', text: e.result });
         }
         if (turn.interrupted) return { text: turn.text, stopped: true };
-        if (e.is_error && started && !turn.text) {
+        if (e.is_error && !turn.text) {
           // A resume that failed also ends here; its reason arrives on stderr as the process exits.
           await Promise.race([this.nextEvent().then(() => {}), new Promise((r) => setTimeout(r, 2000))]);
           if (/no conversation found/i.test(this.stderr)) return { text: '', lost: true };

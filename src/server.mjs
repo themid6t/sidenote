@@ -1,6 +1,6 @@
 // Local web reader: 127.0.0.1 only, random token, answers streamed over SSE.
 import http from 'node:http';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as store from './store.mjs';
@@ -13,7 +13,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.mjs': 'text/javascript', '
   '.css': 'text/css', '.json': 'application/json', '.pdf': 'application/pdf', '.png': 'image/png',
   '.gif': 'image/gif', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.ftl': 'text/plain; charset=utf-8' };
 const mime = (p) => MIME[path.extname(p)] || 'application/octet-stream';
-const decoded = new Map(); // base64 -> Buffer, once per asset
+const decoded = new Map(); // asset -> {body, etag}, worked out once
 
 /** A running server's {port, token, pid}, if it answers. */
 export async function runningServer() {
@@ -94,9 +94,12 @@ async function route(req, res, url) {
   const p = url.pathname;
   const key = p === '/' || /^\/p\/[\w.-]+$/.test(p) ? '/app/index.html' : decodeURIComponent(p);
   if (assets[key]) {
-    if (!decoded.has(key)) decoded.set(key, Buffer.from(assets[key], 'base64'));
-    res.writeHead(200, { 'content-type': mime(key), 'cache-control': 'no-cache' });
-    return res.end(decoded.get(key));
+    // Built into the binary, so they only change with it: an ETag lets the browser reuse its cached, compiled copy.
+    if (!decoded.has(key)) decoded.set(key, { body: Buffer.from(assets[key], 'base64'), etag: `"${createHash('sha1').update(assets[key]).digest('base64url')}"` });
+    const { body, etag } = decoded.get(key);
+    if (req.headers['if-none-match'] === etag) { res.writeHead(304, { etag }); return res.end(); }
+    res.writeHead(200, { 'content-type': mime(key), 'cache-control': 'no-cache', etag });
+    return res.end(body);
   }
   if (p === '/api/health') return send(res, 200, { ok: true });
   if (p === '/api/papers' && req.method === 'GET') return send(res, 200, store.listPapers());
@@ -143,6 +146,7 @@ async function route(req, res, url) {
     const emit = (ev) => { if (!res.destroyed) res.write(`data: ${JSON.stringify(ev)}\n\n`); };
     emit({ type: 'snapshot', ...session.snapshot() });
     session.on('event', emit);
+    try { session.warm(); } catch {} // a reader is open: get Claude Code started
     const beat = setInterval(() => res.write(': keep-alive\n\n'), 25_000);
     req.on('close', () => { clearInterval(beat); session.off('event', emit); });
     return;

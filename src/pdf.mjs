@@ -29,7 +29,10 @@ export async function extract(bytes) {
       if (n === 1) { // the title is the biggest text on page 1 (the first line may be a notice or a header)
         const upright = items.filter((it) => it.str?.trim() && !it.transform[1] && !it.transform[2]); // not arXiv's side stamp
         const big = Math.max(0, ...upright.map((it) => it.transform[3]));
-        bigText = upright.filter((it) => it.transform[3] > big * 0.95).map((it) => it.str.trim()).join(' ');
+        // Whole lines that hold the biggest text, so small-caps titles keep their smaller letters.
+        const lines = new Set(upright.filter((it) => it.transform[3] > big * 0.95).map((it) => Math.round(it.transform[5])));
+        bigText = items.filter((it) => !it.transform[1] && !it.transform[2] && lines.has(Math.round(it.transform[5])))
+          .map((it) => it.str + (it.hasEOL ? ' ' : '')).join('').replace(/\s+/g, ' ').trim();
       }
       if (s.trim()) out.push(`──── page ${n} ────\n${s.trim()}`);
       page.cleanup();
