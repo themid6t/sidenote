@@ -31,6 +31,7 @@ sidenote ls                       # your library
 sidenote open attention           # reopen by any part of the title
 sidenote ask attention "what is multi-head attention for?"   # answer streams in the terminal
 sidenote history attention        # the whole conversation
+sidenote export attention         # the conversation as Markdown, e.g. for Obsidian (--all adds archived chats)
 sidenote new attention            # fresh chat; the old one is archived in the paper's chats/ folder
 sidenote rm attention
 ```

@@ -4,6 +4,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as store from '../src/store.mjs';
+import { exportMarkdown, slug } from '../src/export.mjs';
 import readline from 'node:readline';
 import { getSession } from '../src/session.mjs';
 import { runningServer, startServer } from '../src/server.mjs';
@@ -16,6 +17,8 @@ const HELP = `sidenote ${VERSION}: read papers side by side with Claude
   sidenote ls                          list your library
   sidenote ask <paper> <question…>     ask in the terminal (same conversation as the reader)
   sidenote history <paper>             print the conversation
+  sidenote export <paper> [file]       save the conversation as Markdown (- prints it;
+                                       --all adds the archived chats)
   sidenote new <paper>                 start a fresh chat (the old one is archived)
   sidenote rm <paper>                  delete a paper and its history
   sidenote serve [--port N]            run the reader without opening a browser
@@ -185,6 +188,18 @@ try {
           console.log(m.content);
         } else console.log(`\n${bold('Claude')}\n${m.content}`);
       }
+      break;
+    }
+    case 'export': {
+      const all = rest.includes('--all');
+      const [q, file] = rest.filter((a) => a !== '--all');
+      if (!q) fail('usage: sidenote export <paper> [file] [--all]');
+      const p = store.findPaper(q);
+      if (file === '-') { process.stdout.write(exportMarkdown(p.id, { all })); break; }
+      const out = path.resolve(file || `${slug(p.title, p.id)}.md`);
+      const stem = path.basename(out, path.extname(out));
+      fs.writeFileSync(out, exportMarkdown(p.id, { all, files: { dir: path.join(path.dirname(out), `${stem}-files`), rel: `${stem}-files` } }));
+      console.log(`wrote ${out}`);
       break;
     }
     case 'new': {
