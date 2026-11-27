@@ -52,3 +52,7 @@ pnpm dev ls             # run from source
 pnpm compile            # dist/sidenote-{linux,darwin}-{x64,arm64}, dist/sidenote-windows-x64.exe
 pnpm e2e                # real binary + real browser + real Claude answers (~2 min)
 ```
+
+## License
+
+MIT, see [LICENSE](LICENSE).
