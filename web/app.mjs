@@ -435,7 +435,12 @@ async function reader(id) {
     if (cite) {
       e.preventDefault();
       const block = cite.closest('p, li, td, th, blockquote, h1, h2, h3, h4') || cite.parentElement;
-      flashCite(Number(cite.dataset.page), [...block.textContent.matchAll(/["“]([^"”\n]{4,160})["”]/g)].map((m) => m[1]));
+      const quotes = (el) => (el?.tagName === 'BLOCKQUOTE' ? [el.textContent.trim()]
+        : [...(el?.textContent || '').matchAll(/["“]([^"”\n]{4,300})["”]/g)].map((m) => m[1]));
+      // The quote is usually in the citation's own paragraph, or just above it ("> quote" or "\"…\"" then "p. 5").
+      let qs = quotes(block);
+      if (!qs.length) qs = quotes(block.previousElementSibling);
+      flashCite(Number(cite.dataset.page), qs);
       return;
     }
     const q = e.target.closest('blockquote[data-page]');

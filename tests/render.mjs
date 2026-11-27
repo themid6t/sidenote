@@ -23,7 +23,9 @@ const answer = [
   'max}(QK^T/\\sqrt{d_k})V$$\n\n'
   + 'Bad: $x^{$ and $\\nosuchcmd{x}$. Costs $5 and $10; escaped \\$20 and \\$30.\n\n'
   + 'XSS: $\\href{javascript:alert(1)}{x}$ $\\htmlClass{evil}{y}$ $\\url{javascript:alert(2)}$ '
-  + '$<img src=x onerror="window.pwned=2">$ <img src=x onerror="window.pwned=1"> [l](javascript:window.pwned=3)\n',
+  + '$<img src=x onerror="window.pwned=2">$ <img src=x onerror="window.pwned=1"> [l](javascript:window.pwned=3)\n\n'
+  // The quote on its own line, the page on the next: the passage above the citation still flashes.
+  + '"scaled attention four"\n\nPage 4\n',
 ];
 const env = { ...process.env, SIDENOTE_HOME: path.join(tmp, 'home'), PATH: `${tmp}${path.delimiter}${process.env.PATH}`,
   FAKE_ANSWER: JSON.stringify(answer) };
@@ -101,7 +103,7 @@ try {
     };
   });
   console.log(r);
-  assert.deepEqual(r.cites, ['p. 2>2', 'p. 6>6', 'p. 4>4', 'pp. 4–5>4', 'pp. 5-6>5', 'p. 4>4', 'p. 3>3', 'p. 2>2']);
+  assert.deepEqual(r.cites, ['p. 2>2', 'p. 6>6', 'p. 4>4', 'pp. 4–5>4', 'pp. 5-6>5', 'p. 4>4', 'p. 3>3', 'p. 2>2', 'Page 4>4']);
   assert.equal(r.codeCites, 0);
   assert.equal(r.codeMath, 0);
   assert.deepEqual(r.codeText, ['p. 2', '$x$', 'p. 3 in a block $y$\n']);
@@ -129,6 +131,9 @@ try {
   await page.goBack(); await until(4);
   await page.goBack(); await until(1);
   await page.goForward(); await until(4);
+  await page.waitForFunction(() => !document.querySelector('.cite-flash')); // the earlier flash has faded
+  await page.click('#m2 a.cite:text-is("Page 4")');
+  await page.waitForSelector('.page[data-page-number="4"] .cite-flash');
   if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, 'render.png') });
   assert.deepEqual(errors, []);
   console.log('render ok');
