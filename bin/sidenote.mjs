@@ -7,8 +7,8 @@ import * as store from '../src/store.mjs';
 import readline from 'node:readline';
 import { getSession } from '../src/session.mjs';
 import { runningServer, startServer } from '../src/server.mjs';
+import { VERSION, REPO, newerVersion } from '../src/update.mjs';
 
-const VERSION = process.env.SIDENOTE_VERSION || 'dev';
 const HELP = `sidenote ${VERSION}: read papers side by side with Claude
 
   sidenote <pdf | arXiv id | url>      add the paper and open it in the reader
@@ -26,28 +26,13 @@ In the reader: select text and ask, E explains the selection,
 R then drag captures a region (figures, tables). Data lives in:
   ${store.HOME}`;
 
-const REPO = 'themid6t/sidenote';
 const INSTALL = process.platform === 'win32'
   ? `irm https://raw.githubusercontent.com/${REPO}/main/install.ps1 | iex`
   : `curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | sh`;
 
-// At most once a day, ask GitHub for the latest release and mention it if it's newer. Never blocks or fails a command.
-// Off with SIDENOTE_NO_UPDATE_CHECK=1.
+// Mentions a newer release in the terminal; never blocks or fails a command. (The reader shows it too.)
 function checkForUpdate() {
-  if (VERSION === 'dev' || process.env.SIDENOTE_NO_UPDATE_CHECK) return;
-  const file = path.join(store.HOME, 'update-check.json');
-  let last = {};
-  try { last = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
-  const newer = (v) => v && v.localeCompare(VERSION, undefined, { numeric: true }) > 0;
-  const tell = (v) => console.error(dim(`sidenote ${v} is out (you have ${VERSION}). Update: sidenote update`));
-  if (Date.now() - (last.at || 0) < 864e5) { if (newer(last.latest)) tell(last.latest); return; }
-  fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { signal: AbortSignal.timeout(5000) })
-    .then((r) => r.json()).then(({ tag_name }) => {
-      const latest = String(tag_name || '').replace(/^v/, '');
-      fs.mkdirSync(store.HOME, { recursive: true });
-      fs.writeFileSync(file, JSON.stringify({ at: Date.now(), latest }));
-      if (newer(latest)) tell(latest);
-    }).catch(() => {});
+  newerVersion().then((v) => v && console.error(dim(`sidenote ${v} is out (you have ${VERSION}). Update: sidenote update`)));
 }
 
 const dim = (s) => (process.stdout.isTTY ? `\x1b[2m${s}\x1b[0m` : s);

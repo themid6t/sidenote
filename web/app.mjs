@@ -16,6 +16,17 @@ const md = (s) => DOMPurify.sanitize(marked.parse(s), { FORBID_TAGS: ['img', 'st
 const paperId = location.pathname.match(/^\/p\/([\w.-]+)$/)?.[1];
 if (paperId) reader(decodeURIComponent(paperId)); else library();
 
+// A newer release? Say so in the corner, with the command that installs it.
+api('/api/update').then(({ version, latest }) => {
+  if (!latest) return;
+  const el = document.createElement('div');
+  el.id = 'update';
+  el.innerHTML = `sidenote ${esc(latest)} is out (you have ${esc(version)}). Run <code>sidenote update</code>, then restart sidenote.
+    <button type="button" title="Hide until next time">×</button>`;
+  el.querySelector('button').onclick = () => el.remove();
+  document.body.append(el);
+}).catch(() => {});
+
 // ───────────────────────────── Library ─────────────────────────────
 async function library() {
   $('#library').hidden = false;

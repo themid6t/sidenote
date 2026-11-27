@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as store from './store.mjs';
 import { getSession, closeAll, OVERVIEW } from './session.mjs';
+import { VERSION, newerVersion } from './update.mjs';
 
 import assets from './assets.gen.mjs';
 
@@ -109,6 +110,7 @@ async function route(req, res, url) {
     return res.end(body);
   }
   if (p === '/api/health') return send(res, 200, { ok: true });
+  if (p === '/api/update') return newerVersion().then((latest) => send(res, 200, { version: VERSION, latest }));
   if (p === '/api/papers' && req.method === 'GET') return send(res, 200, store.listPapers());
   if (p === '/api/papers' && req.method === 'POST') {
     const { src } = await readJson(req);
