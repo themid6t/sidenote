@@ -41,7 +41,9 @@ In the reader:
 - **Ask about text:** select it, then type a question.
 - **Explain a passage:** select it and press `E`.
 - **Figures and tables:** press `R` (or click **Region**) and drag a box over the figure or table.
+- **Check an answer:** page references like "p. 5" are links. Click one to jump there and flash the passage; Back returns you. Equations in answers are typeset, and for arXiv papers Claude quotes them from the LaTeX source.
 - **Find a past question:** click a past question's quote to jump to its highlight, or click a highlight to jump to the conversation.
+- **Keep your notes:** **Export** downloads the conversation as Markdown.
 
 The terminal and the reader share one conversation per paper.
 
@@ -50,7 +52,7 @@ The terminal and the reader share one conversation per paper.
 - **The binary:** one self-contained file holds the CLI, a local web server and the reader UI (pdf.js).
 - **The server:** it listens on `127.0.0.1` only. A random token is set per run, and it rejects foreign Host and Origin headers.
 - **Questions:** each paper gets one live Claude Code session, started in the paper's folder and kept running while you read. It is a normal session: your tools, settings, hooks, `CLAUDE.md` and MCP servers all apply. Whenever Claude wants to do something that would normally ask for permission, an Allow / Deny card shows the exact command in the chat (or a y/N prompt in the terminal). sidenote always starts the session in the asking mode, even if your default is to bypass permissions, because a PDF is untrusted input. Anything your settings already allow runs without a card. After 30 minutes idle the process closes, and the next question resumes it. If the session can't be resumed, a new one starts with the saved history.
-- **Your data:** it is plain files in `~/.local/share/sidenote` (`%APPDATA%\sidenote` on Windows). Each paper has its own folder with the PDF, its text (plus `paper.tex`, the LaTeX source, for arXiv papers that have one), `meta.json`, `messages.json` and `highlights.json`. Set `SIDENOTE_HOME` to move it, or `SIDENOTE_MODEL` to choose a model.
+- **Your data:** it is plain files in `~/.local/share/sidenote` (`%APPDATA%\sidenote` on Windows). Each paper has its own folder with the PDF, its text (plus `paper.tex`, the LaTeX source, for arXiv papers that have one), `meta.json`, `messages.json` and `highlights.json`. Set `SIDENOTE_HOME` to move it, or `SIDENOTE_MODEL` to choose a model. Your papers and history stay on your machine; Claude itself runs in the cloud under your Claude Code account, as it does in the terminal.
 
 ## Develop
 
