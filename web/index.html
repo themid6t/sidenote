@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sidenote</title>
+  <link rel="stylesheet" href="/vendor/pdfjs/web/pdf_viewer.css">
+  <link rel="stylesheet" href="/app/app.css">
+</head>
+<body>
+  <!-- Library: "/" -->
+  <main id="library" hidden>
+    <header><h1>sidenote</h1><p class="muted">Read papers side by side with Claude.</p></header>
+    <form id="add">
+      <input id="src" placeholder="arXiv id, PDF URL, or path to a PDF on this computer" autocomplete="off" required>
+      <button>Open</button>
+    </form>
+    <p id="add-status" class="muted" role="status"></p>
+    <ul id="papers"></ul>
+  </main>
+
+  <!-- Reader: "/p/<id>" -->
+  <div id="reader" hidden>
+    <section id="doc">
+      <nav id="bar">
+        <a href="/" title="Library">←</a>
+        <span id="title"></span>
+        <span class="spacer"></span>
+        <button id="region-btn" title="Capture a region (R): drag over a figure or table">▭ Region</button>
+        <button id="zoom-out" title="Zoom out">−</button>
+        <button id="zoom-fit" title="Fit width">Fit</button>
+        <button id="zoom-in" title="Zoom in">+</button>
+        <span id="pageno" class="muted"></span>
+      </nav>
+      <div id="docbody"><div id="viewerContainer"><div id="viewer" class="pdfViewer"></div></div></div>
+      <button id="ask-float" hidden>Ask about this <kbd>⌃E</kbd></button>
+    </section>
+    <div id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panes" tabindex="0"
+      title="Drag to resize · double-click to reset"></div>
+    <aside id="side">
+      <div id="chat" aria-live="polite"></div>
+      <form id="composer">
+        <div id="quote" hidden><span id="quote-text"></span><button type="button" id="quote-x" title="Clear (Esc)">×</button></div>
+        <textarea id="q" rows="2" placeholder="Select text in the paper, then ask… (Enter to send)"></textarea>
+        <div id="composer-foot"><span id="status" class="muted"></span><button type="button" id="new-chat" title="Start a fresh chat about this paper (the current one is archived)">New chat</button><button id="send">Ask</button></div>
+      </form>
+    </aside>
+  </div>
+  <script type="module" src="/app/app.mjs"></script>
+</body>
+</html>

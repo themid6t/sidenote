@@ -1,0 +1,33 @@
+{
+  "name": "sidenote",
+  "version": "0.1.0",
+  "description": "Read papers side by side with Claude: a CLI plus a local web reader",
+  "type": "module",
+  "bin": {
+    "sidenote": "bin/sidenote.mjs"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "dompurify": "^3.5.0",
+    "marked": "18.3.0",
+    "pdfjs-dist": "6.5.438"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.1"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "compile": "node scripts/build.mjs --compile",
+    "dev": "node scripts/build.mjs && node bin/sidenote.mjs",
+    "e2e": "node tests/e2e.mjs",
+    "prepack": "node scripts/build.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "install.sh"
+  ]
+}
